@@ -1,0 +1,4 @@
+.coc-bot.db
+.env
+env/
+__pycache__/
