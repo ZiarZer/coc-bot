@@ -57,6 +57,12 @@ class User:
         return self.global_name or self.username
 
 
+class ChannelType(Enum):
+    GUILD_TEXT = 0
+    DM = 1
+    OTHER = -1
+
+
 class Message:
     def __init__(self, raw_message: dict) -> None:
         self.id = raw_message['id']
@@ -67,6 +73,10 @@ class Message:
         self.author = User(raw_message['author'])
         self.timestamp = raw_message['timestamp']
         self.mentions = list(map(lambda u: u['id'], raw_message.get('mentions', [])))
+        channel_type_code: Optional[str] = raw_message.get('channel_type')
+        self.channel_type = ChannelType.OTHER
+        if channel_type_code is not None and channel_type_code in ChannelType:
+            self.channel_type = ChannelType(channel_type_code)
 
 
 class PresenceActivity:

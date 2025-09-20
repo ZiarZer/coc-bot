@@ -7,7 +7,7 @@ from typing import Optional
 from dotenv import load_dotenv
 
 from models.clash_of_clans import ClanRole, WarScore, War, WarClan, WarParticipant, CapitalRaidSeason, CWLGroup
-from models.discord import Message, User, PresenceActivity
+from models.discord import Message, ChannelType, User, PresenceActivity
 from clients import DiscordGatewayClient, ClashOfClansApiClient, DiscordApiClient
 from repositories import CommandUsesRepository, DiscordCocLinksRepository, TroopGiversRepository, WhitelistsRepository
 from services import ClanMembersService
@@ -238,6 +238,9 @@ class Bot:
         await self.discord_api_client.send_message(message.channel_id, ':white_check_mark: Channel whitelisté')
 
     async def whitelist_guild(self, message: Message) -> None:
+        if message.guild_id is None:
+            log(f'Aborted whitelist_guild command, message has no guild ID.', LogLevel.INFO)
+            return
         self.whitelists_repository.insert_whitelist(message.guild_id, 'GUILD')
         await self.discord_api_client.send_message(message.channel_id, ':white_check_mark: Serveur whitelisté')
 
@@ -474,7 +477,7 @@ class Bot:
         command_name = splitted[0][1:].lower()
         if command_name in self.commands:
             command = self.commands[command_name]
-            can_run_command = command.bypass_whitelist
+            can_run_command = message.channel_type == ChannelType.DM or command.bypass_whitelist
             if not can_run_command:
                 can_run_command = self.whitelists_repository.is_whitelisted(message.channel_id, message.guild_id)
             if can_run_command:

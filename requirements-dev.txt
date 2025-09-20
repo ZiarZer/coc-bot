@@ -2,3 +2,4 @@
 
 mypy
 pycodestyle
+types-requests
