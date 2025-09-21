@@ -1,10 +1,9 @@
-from typing import Optional
-from .db_connection import DbConnection
+from .base_repository import BaseRepository
 
 
-class TroopGiversRepository:
+class TroopGiversRepository(BaseRepository):
     def __init__(self):
-        self.db_connection = DbConnection()
+        super().__init__()
 
     def init_table(self):
         self.db_connection.query('''

@@ -1,4 +1,4 @@
 from .command_uses_repository import CommandUsesRepository
 from .discord_coc_links_repository import DiscordCocLinksRepository
-from .troop_givers import TroopGiversRepository
-from .whitelists import WhitelistsRepository
+from .troop_givers_repository import TroopGiversRepository
+from .whitelists_repository import WhitelistsRepository

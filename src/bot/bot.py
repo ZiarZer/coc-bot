@@ -10,7 +10,7 @@ from models.clash_of_clans import ClanRole, WarScore, War, WarClan, WarParticipa
 from models.discord import Message, ChannelType, User, PresenceActivity
 from clients import DiscordGatewayClient, ClashOfClansApiClient, DiscordApiClient
 from repositories import CommandUsesRepository, DiscordCocLinksRepository, TroopGiversRepository, WhitelistsRepository
-from services import ClanMembersService
+from services import ClanMembersService, ClanWarsService, CapitalRaidsService
 from utils import to_timestamp, parse_year_month, log, LogLevel
 
 from .custom_pings import parse_custom_ping
@@ -56,10 +56,6 @@ class Bot:
         self.command_uses_repository = CommandUsesRepository()
         self.troop_givers_repository = TroopGiversRepository()
         self.whitelists_repository = WhitelistsRepository()
-        self.discord_coc_links_repository.init_table()
-        self.command_uses_repository.init_table()
-        self.troop_givers_repository.init_table()
-        self.whitelists_repository.init_table()
 
         self.discord_api_client = DiscordApiClient(discord_auth_token)
         self.discord_gateway_client = DiscordGatewayClient(
@@ -77,21 +73,20 @@ class Bot:
         self.activities: dict[str, Optional[PresenceActivity]] = {}
 
         # Wars
-        self.current_war: Optional[War] = None
-        self.war_last_fetched_at: Optional[float] = None
-        self.war_fetch_next_task: Optional[asyncio.TimerHandle] = None
-
-        # CWL
-        self.current_cwl_group: Optional[CWLGroup] = None
-        self.cwl_last_fetched_at: Optional[float] = None
-        self.league_end_time: Optional[float] = None
-        self.cwl_scores: dict[str, WarScore] = {}  # Keys are in the format '#WARTAG#CLANTAG'
-        self.ended_cwl_wars: dict[str, War] = {}
+        self.clan_wars_service = ClanWarsService(
+            self.clan_tag,
+            self.coc_api_client,
+            self.discord_api_client,
+            self.on_current_war_change
+        )
 
         # Capital raids
-        self.current_capital_raid_season: Optional[CapitalRaidSeason] = None
-        self.raid_last_fetched_at: Optional[float] = None
-        self.raid_fetch_next_task: Optional[asyncio.TimerHandle] = None
+        self.capital_raids_service = CapitalRaidsService(
+            self.clan_tag,
+            self.coc_api_client,
+            self.discord_api_client,
+            self.on_current_raid_change
+        )
 
         # Clan members
         self.clan_members_service = ClanMembersService(self.clan_tag, self.coc_api_client, self.discord_api_client)
@@ -123,81 +118,22 @@ class Bot:
         self.started_at = time()
         await self.discord_gateway_client.run()
 
-    async def get_current_war(self) -> Optional[War]:
-        if self.war_last_fetched_at is not None and time() - self.war_last_fetched_at < 3:
-            return self.current_war
-        current_war = await self.coc_api_client.get_current_war(self.clan_tag)
-        if current_war is not None:
-            self.current_war = current_war
-            self.war_last_fetched_at = time()
-            log('Succesfully fetched war', LogLevel.INFO)
-            await self.update_presence_with_current_war()
-            if self.war_fetch_next_task is not None:
-                self.war_fetch_next_task.cancel()
-            duration = 3600
-            if current_war.state == 'preparation':
-                duration = to_timestamp(current_war.war_start_time) - int(time()) + 300
-            elif current_war.state == 'inWar' and to_timestamp(current_war.end_time) - int(time()) < 3600:
-                duration = to_timestamp(current_war.end_time) - int(time()) + 300
-            event_loop = asyncio.get_event_loop()
-            self.war_fetch_next_task = event_loop.call_later(duration, self.run_current_war_fetch_task)
-            return current_war
-        return None
+    async def on_current_war_change(self, war: War):
+        # TODO: should be done async to not block return
+        self.activities['WAR'] = war.build_presence_activity()
+        if war.is_cwl:
+            self.activities['CWL'] = war.build_cwl_presence_activity()
+        await self.update_presence()
 
-    async def get_current_capital_raid_season(self):
-        if self.raid_last_fetched_at is not None and time() - self.raid_last_fetched_at < 3:
-            return self.current_capital_raid_season
-        current_season = await self.coc_api_client.get_current_capital_raid_season(self.clan_tag)
-        if current_season is not None:
-            self.current_capital_raid_season = current_season
-            self.raid_last_fetched_at = time()
-            log('Succesfully fetched capital raid', LogLevel.INFO)
-            await self.update_presence_with_current_capital_raid_season()
-            event_loop = asyncio.get_event_loop()
-            if self.raid_fetch_next_task is not None:
-                self.raid_fetch_next_task.cancel()
-            self.raid_fetch_next_task = event_loop.call_later(10800, self.run_raid_capital_season_fetch_task)  # 3 hours
-            return current_season
+    async def on_current_raid_change(self, capital_raid_season: CapitalRaidSeason):
+        # TODO: should be done async to not block return
+        if capital_raid_season.state == 'ongoing':
+            self.activities['RAID'] = capital_raid_season.build_presence_activity()
+            await self.update_presence()
 
-    async def get_current_cwl_group(self):
-        if self.cwl_last_fetched_at is not None and time() - self.cwl_last_fetched_at < 3:
-            return self.current_cwl_group
-        league_group = await self.coc_api_client.get_current_leaguegroup(self.clan_tag)
-        if league_group is not None:
-            self.current_cwl_group = league_group
-            self.cwl_last_fetched_at = time()
-            log('Succesfully fetched cwl group', LogLevel.INFO)
-        else:
-            return None
-
-        clan_scores = {c.tag: WarScore() for c in league_group.clans}
-        for ir in range(len(league_group.rounds)):
-            round = league_group.rounds[ir]
-            for war_tag in round.war_tags:
-                war = self.ended_cwl_wars.get(war_tag)
-                if war is None:
-                    war = await self.coc_api_client.get_cwl_war(war_tag)
-                    if war is not None:
-                        war.league_day = ir + 1
-                        if war.state == 'warEnded':
-                            self.ended_cwl_wars[war_tag] = war
-                        if war.state == 'inWar' and self.clan_tag in (war.clan.tag, war.opponent.tag):
-                            self.current_war = war
-                            self.war_last_fetched_at = time()
-
-                if war is not None:
-                    clan_1_tag, clan_2_tag = war.clan.tag, war.opponent.tag
-                    clan_scores[clan_1_tag].add_to_score(war.clan)
-                    clan_scores[clan_2_tag].add_to_score(war.opponent)
-                    star_diff = war.clan.stars - war.opponent.stars
-                    percent_diff = war.clan.destruction_percentage - war.opponent.destruction_percentage
-                    if war.state == 'warEnded':
-                        if star_diff > 0 or star_diff == 0 and percent_diff > 0:
-                            clan_scores[clan_1_tag].stars += 10
-                        elif star_diff < 0 or star_diff == 0 and percent_diff < 0:
-                            clan_scores[clan_2_tag].stars += 10
-        league_group.clan_scores = clan_scores
-        return league_group
+    async def get_current_capital_raid_season(self) -> Optional[CapitalRaidSeason]:
+        capital_raid_season = await self.capital_raids_service.get_current_capital_raid_season()
+        return capital_raid_season
 
     async def update_presence(self) -> None:
         ACTIVITIES_ORDER = ('WAR', 'CWL', 'RAID', 'CLAN')
@@ -208,22 +144,6 @@ class Bot:
                 sorted(self.activities.items(), key = lambda a: ACTIVITIES_ORDER.index(a[0]))
             ) if activity is not None
         ])
-
-    async def update_presence_with_current_war(self) -> None:
-        war = self.current_war
-        if war is None:
-            return
-        self.activities['WAR'] = war.build_presence_activity()
-        if war.is_cwl:
-            self.activities['CWL'] = war.build_cwl_presence_activity()
-        await self.update_presence()
-
-    async def update_presence_with_current_capital_raid_season(self) -> None:
-        if self.current_capital_raid_season is None:
-            return
-        if self.current_capital_raid_season.state == 'ongoing':
-            self.activities['RAID'] = self.current_capital_raid_season.build_presence_activity()
-        await self.update_presence()
 
     async def invite(self, message: Message) -> None:
         title_emojis = CLAN_BANNER_EMOJI if self.can_use_custom_emojis else ':blue_heart::white_heart::blue_heart:'
@@ -305,7 +225,7 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def cwl(self, message: Message):
-        cwl_group = await self.get_current_cwl_group()
+        cwl_group = await self.clan_wars_service.get_current_cwl_group()
         if cwl_group is None:
             content = "Le clan n'est actuellement pas en ligue de guerres de clans"
         else:
@@ -324,8 +244,9 @@ class Bot:
                 )
             )
             content = f'# Ligue de guerre - saison {parse_year_month(cwl_group.season)}\n' + content
-            if cwl_group.state == 'inWar' and self.current_war is not None:
-                content += '\n' + self.current_war.as_discord_message(self.can_use_custom_emojis, short=True)
+            current_war = await self.clan_wars_service.get_current_war()
+            if cwl_group.state == 'inWar' and current_war is not None:
+                content += '\n' + current_war.as_discord_message(self.can_use_custom_emojis, short=True)
         await self.discord_api_client.send_message(message.channel_id, content)
 
     async def compute_spyed_defender_string(self, war_participant: WarParticipant) -> str:
@@ -349,7 +270,7 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def spy_cwl(self, message: Message):
-        current_war = await self.get_current_war()
+        current_war = await self.clan_wars_service.get_current_war()
         if current_war is None or not current_war.is_cwl or current_war.league_day is None:
             await self.discord_api_client.send_message(message.channel_id, 'Aucune ligue de guerre de clans en cours')
             return
@@ -364,10 +285,10 @@ class Bot:
             else:
                 spyed_day += 1
 
-        league_group = await self.get_current_cwl_group()
+        league_group = await self.clan_wars_service.get_current_cwl_group()
         if spyed_day <= len(league_group.rounds):
             for war_tag in league_group.rounds[spyed_day - 1].war_tags:
-                fetched_war = self.ended_cwl_wars.get(war_tag)
+                fetched_war = self.clan_wars_service.ended_cwl_wars.get(war_tag)
                 if fetched_war is None:
                     fetched_war = await self.coc_api_client.get_cwl_war(war_tag)
                 if fetched_war is None:
@@ -396,7 +317,7 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def war(self, message: Message):
-        current_war = await self.get_current_war()
+        current_war = await self.clan_wars_service.get_current_war()
         if current_war is None:
             content = 'Aucune guerre en cours'
         else:
@@ -442,7 +363,7 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def attacks(self, message: Message):
-        current_war = await self.get_current_war()
+        current_war = await self.clan_wars_service.get_current_war()
         if current_war is None:
             await self.discord_api_client.send_message(message.channel_id, 'Aucune guerre en cours')
         else:
@@ -493,27 +414,13 @@ class Bot:
             self.clan_tag,
             application_id = CLAN_APPLICATION_ID
         )
-        await self.get_current_war()
-        now = datetime.now()
-        if now.weekday() >= 4 or now.weekday() == 0 and now.hour <= 12:
-            await self.get_current_capital_raid_season()
-        else:
-            days_delta, seconds_delta = 4 - now.weekday(), (12 - now.hour) * 3600 - now.minute * 60 - now.second
-            duration = days_delta * 86400 + seconds_delta
-            event_loop = asyncio.get_event_loop()
-            self.raid_fetch_next_task = event_loop.call_later(duration, self.run_raid_capital_season_fetch_task)
+        await self.clan_wars_service.get_current_war()
 
     async def on_error(self, e: Exception):
         content = f'**:warning: ERROR**\n```\n{traceback.format_exc()}```'
         log(str(e), LogLevel.ERROR)
         if BACKOFFICE_CHANNEL_ID is not None:
             await self.discord_api_client.send_message(BACKOFFICE_CHANNEL_ID, content)
-
-    def run_raid_capital_season_fetch_task(self):
-        asyncio.create_task(self.get_current_capital_raid_season())
-
-    def run_current_war_fetch_task(self):
-        asyncio.create_task(self.get_current_war())
 
     async def on_message(self, data: dict):
         created_msg = Message(data)
