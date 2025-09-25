@@ -2,7 +2,7 @@ import asyncio
 import os
 import traceback
 from time import time
-from datetime import datetime
+import re
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -166,7 +166,19 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def troops(self, message: Message):
-        snowflakes = self.troop_givers_repository.get_pingable_troop_givers()
+        troop_givers: list[tuple[str, str]] = self.troop_givers_repository.get_pingable_troop_givers()
+        params = message.content.split()[1:]
+        if len(params) > 0:
+            match = re.match("((hdv)|(th))?(\\d{1,2})", params[0])
+            if match:
+                min_townhall = int(match.groups()[3])
+                eligible_members = await self.clan_members_service.get_clan_members(
+                    lambda m: m.townhall_level >= min_townhall
+                )
+                eligible_player_tags = list(map(lambda m: m.tag, eligible_members))
+                troop_givers = list(filter(lambda g: g[1] in eligible_player_tags, troop_givers))
+
+        snowflakes = list(set(troop_giver[0] for troop_giver in troop_givers))
         if len(snowflakes) == 0:
             await self.discord_api_client.send_message(
                 message.channel_id,

@@ -21,9 +21,10 @@ class TroopGiversRepository(BaseRepository):
             (discord_user_id, can_ping)
         )
 
-    def get_pingable_troop_givers(self) -> list[str]:
-        return [
-            record[0] for record in self.db_connection.record_lookup(
-                'SELECT `discord_user_id` FROM `troop_givers` WHERE `can_ping` = 1'
-            )
-        ]
+    def get_pingable_troop_givers(self) -> list[tuple[str, str]]:
+        return self.db_connection.record_lookup(
+            '''SELECT dcl.`discord_user_id`, dcl.`coc_player_tag`
+            FROM `discord_coc_links` dcl INNER JOIN `troop_givers` tg
+            ON dcl.`discord_user_id` = tg.`discord_user_id`
+            WHERE `can_ping` = 1'''
+        )

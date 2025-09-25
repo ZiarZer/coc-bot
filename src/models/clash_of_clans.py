@@ -178,6 +178,8 @@ class War:
         self.tag: Optional[str] = tag
 
     def __eq__(self, other_war) -> bool:
+        if other_war is None:
+            return False
         if self.state != other_war.state or self.clan != other_war.clan or self.opponent != other_war.opponent:
             return False
         if self.is_cwl != other_war.is_cwl:

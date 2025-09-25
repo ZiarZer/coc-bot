@@ -40,7 +40,7 @@ class ClanWarsService:
         current_war = await self.coc_api_client.get_current_war(self.clan_tag)
         if current_war is not None:
             if self.on_current_war_change is not None and self.current_war != current_war:
-                self.on_current_war_change(current_war)
+                await self.on_current_war_change(current_war)
             self.current_war = current_war
             self.war_last_fetched_at = time()
             log('Succesfully fetched war', LogLevel.INFO)

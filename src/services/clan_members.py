@@ -20,7 +20,7 @@ class ClanMembersService:
 
     async def get_clan_members(
         self,
-        custom_ping_filter: Callable[[ClanMember], bool],
+        custom_ping_filter: Optional[Callable[[ClanMember], bool]] = None,
         force_fetch = False
     ) -> list[ClanMember]:
         must_refresh = self.members_last_fetched_at is None or time() - self.members_last_fetched_at > 28800
@@ -28,8 +28,8 @@ class ClanMembersService:
             clan_members = await self.coc_api_client.get_clan_members(self.clan_tag)
             members_count = len(clan_members)
             if members_count > 0:
-                if len(self.clan_members) > 0 and members_count >= CLAN_MEMBERS_WARNING_THRESHOLD:
-                    warning_message = f'Le Clan est f{"bientôt" if members_count < 50 else ""} rempli'
+                if len(self.clan_members) > 0 and members_count != len(self.clan_members) and members_count >= CLAN_MEMBERS_WARNING_THRESHOLD:
+                    warning_message = f'Le Clan est {"bientôt" if members_count < 50 else ""} rempli'
                     await self.discord_api_client.send_message(
                         CLAN_MAIN_CHANNEL_ID,
                         f'**:warning: {warning_message} ({members_count}/50)**'
@@ -37,4 +37,6 @@ class ClanMembersService:
                 self.clan_members = clan_members
                 self.members_last_fetched_at = time()
                 log('Succesfully fetched clan members', LogLevel.INFO)
+        if custom_ping_filter is None:
+            return self.clan_members
         return list(filter(custom_ping_filter, self.clan_members))

@@ -5,7 +5,6 @@ from typing import Optional
 from clients import ClashOfClansApiClient, DiscordApiClient
 from models.clash_of_clans import CapitalRaidSeason
 from utils import log, LogLevel
-from .base_service import BaseService
 
 
 class CapitalRaidsService:
@@ -40,7 +39,7 @@ class CapitalRaidsService:
         current_season = await self.coc_api_client.get_current_capital_raid_season(self.clan_tag)
         if current_season is not None:
             if self.on_current_raid_change is not None and self.current_war != current_season:
-                self.on_current_raid_change(current_season)
+                await self.on_current_raid_change(current_season)
             self.current_capital_raid_season = current_season
             self.raid_last_fetched_at = time()
             log('Succesfully fetched capital raid', LogLevel.INFO)
