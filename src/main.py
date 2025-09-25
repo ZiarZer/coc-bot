@@ -7,6 +7,7 @@ from utils import log
 
 load_dotenv()
 CLAN_TAG = '#2GLCQ00G0'
+SECONDARY_CLAN_TAG = '#2JG02GVYL'
 
 
 async def main():
@@ -18,7 +19,7 @@ async def main():
 
     COC_API_TOKEN = os.environ.get('COC_API_TOKEN')
 
-    bot = Bot(CLAN_TAG, discord_auth_token, COC_API_TOKEN)
+    bot = Bot(CLAN_TAG, discord_auth_token, COC_API_TOKEN, secondary_clan_tag=SECONDARY_CLAN_TAG)
     await bot.run()
 
 

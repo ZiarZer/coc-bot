@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional
 from utils import to_timestamp, format_number
-from .discord import PresenceActivity
+from .discord import PresenceActivity, embed
 
 
 TOWNHALL_CUSTOM_EMOJIS = {
@@ -339,6 +339,17 @@ class Pet(Enum):
     FROSTY = 'Frosty'
     SPIRIT_FOX = 'Spirit Fox'
     ANGRY_JELLY = 'Angry Jelly'
+
+
+class Clan:
+    def __init__(self, raw_clan: dict) -> None:
+        self.tag: str = raw_clan['tag']
+        self.name: str = raw_clan['name']
+        self.badge_url: str = raw_clan['badgeUrls']['large']
+
+    def as_discord_embed(self) -> embed.Embed:
+        invite_link = f'https://link.clashofclans.com/fr?action=OpenClanProfile&tag={self.tag}'
+        return embed.Embed(self.name, self.tag, url=invite_link).set_thumbnail(self.badge_url)
 
 
 class Player:

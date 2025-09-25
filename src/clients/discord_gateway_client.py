@@ -94,16 +94,19 @@ class DiscordGatewayClient:
         asyncio.create_task(self.send_websocket_message(WsMessage(WsMessageType.HEARTBEAT.value)))
 
     async def identify(self) -> None:
+        data: dict = {
+            'token': self.authorization_token,
+            'properties': {
+                'os': os.uname().sysname,
+                'browser': self.app_name,
+                'device': self.app_name
+            }
+        }
+        if self.authorization_token.startswith('Bot '):
+            data['intents'] = 46592
         await self.send_websocket_message(WsMessage(
             WsMessageType.IDENTIFY.value,
-            {
-                'token': self.authorization_token,
-                'properties': {
-                    'os': os.uname().sysname,
-                    'browser': self.app_name,
-                    'device': self.app_name
-                }
-            }
+            data
         ))
 
     async def resume(self) -> None:

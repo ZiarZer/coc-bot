@@ -1,7 +1,7 @@
 import urllib.parse
 from typing import Optional
 
-from models.clash_of_clans import ClanMember, War, CWLGroup, CapitalRaidSeason, Player
+from models.clash_of_clans import Clan, ClanMember, War, CWLGroup, CapitalRaidSeason, Player
 from .base_api_client import BaseApiClient
 from utils import log, LogLevel
 
@@ -82,6 +82,12 @@ class ClashOfClansApiClient(BaseApiClient):
         if war is not None:
             war.league_day = league_day
         return war
+
+    async def get_clan(self, clan_tag: str) -> Optional[Clan]:
+        response = await self.GET(f'clans/{urllib.parse.quote(clan_tag)}')
+        if response.status_code == 200:
+            return Clan(response.json())
+        return None
 
     async def get_player(self, player_tag: str) -> Optional[Player]:
         response = await self.GET(f'players/{urllib.parse.quote(player_tag)}')

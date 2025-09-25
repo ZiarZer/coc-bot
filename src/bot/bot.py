@@ -6,7 +6,7 @@ import re
 from typing import Optional
 from dotenv import load_dotenv
 
-from models.clash_of_clans import ClanRole, WarScore, War, WarClan, WarParticipant, CapitalRaidSeason, CWLGroup
+from models.clash_of_clans import ClanRole, War, WarClan, WarParticipant, CapitalRaidSeason
 from models.discord import Message, ChannelType, User, PresenceActivity
 from clients import DiscordGatewayClient, ClashOfClansApiClient, DiscordApiClient
 from repositories import CommandUsesRepository, DiscordCocLinksRepository, TroopGiversRepository, WhitelistsRepository
@@ -51,7 +51,14 @@ BACKOFFICE_CHANNEL_ID = os.environ.get('BACKOFFICE_CHANNEL_ID')
 
 
 class Bot:
-    def __init__(self, clan_tag: str, discord_auth_token: str, coc_api_token: str, prefix = '>') -> None:
+    def __init__(
+        self,
+        clan_tag: str,
+        discord_auth_token: str,
+        coc_api_token: str,
+        prefix = '>',
+        secondary_clan_tag: Optional[str] = None
+    ) -> None:
         self.discord_coc_links_repository = DiscordCocLinksRepository()
         self.command_uses_repository = CommandUsesRepository()
         self.troop_givers_repository = TroopGiversRepository()
@@ -68,6 +75,7 @@ class Bot:
         self.coc_api_client = ClashOfClansApiClient(coc_api_token)
         self.clan_tag = clan_tag
         self.clan_invite_link = f'https://link.clashofclans.com/fr?action=OpenClanProfile&tag={clan_tag}'
+        self.secondary_clan_tag = secondary_clan_tag
         self.prefix = prefix
         self.can_use_custom_emojis = False
         self.activities: dict[str, Optional[PresenceActivity]] = {}
@@ -79,6 +87,12 @@ class Bot:
             self.discord_api_client,
             self.on_current_war_change
         )
+        if self.secondary_clan_tag is not None:
+            self.secondary_clan_wars_service = ClanWarsService(
+                self.secondary_clan_tag,
+                self.coc_api_client,
+                self.discord_api_client
+            )
 
         # Capital raids
         self.capital_raids_service = CapitalRaidsService(
@@ -92,19 +106,26 @@ class Bot:
         self.clan_members_service = ClanMembersService(self.clan_tag, self.coc_api_client, self.discord_api_client)
 
         commands = [
+            Command('claninfo', self.clan_info, aliases=['clan']),
+
             Command('gdc', self.war, aliases=['war']),
             Command('ldc', self.cwl, aliases=['cwl', 'ligue', 'league']),
             Command('spyldc', self.spy_cwl, aliases=['spycwl', 'spyleague']),
+            Command('attacks', self.attacks, aliases=['attaques', 'att']),
+
             Command('annonce', self.announce, aliases=['announce'], hidden=True),
+
             Command('troops', self.troops, aliases=['troupes', 'tdc']),
             Command('troopgiver', self.add_troop_giver, aliases=['addtroopgiver']),
             Command('removetroopgiver', self.remove_troop_giver),
-            Command('attacks', self.attacks, aliases=['attaques', 'att']),
-            Command('invite', self.invite),
+
             Command('whitelistchannel', self.whitelist_channel, bypass_whitelist=True),
             Command('whitelistguild', self.whitelist_guild, bypass_whitelist=True),
+
+            Command('invite', self.invite),
             Command('help', self.help),
             Command('about', self.about),
+
             Command('todo', self.todo, hidden=True),
         ]
         self.help_message = 'commands:\n' + '\n'.join([c.help_entry(self.prefix) for c in commands if not c.hidden])
@@ -144,6 +165,12 @@ class Bot:
                 sorted(self.activities.items(), key = lambda a: ACTIVITIES_ORDER.index(a[0]))
             ) if activity is not None
         ])
+
+    def get_clan_wars_service(self, command_params):
+        clan_wars_service = self.clan_wars_service
+        if len(command_params) > 0 and command_params[0].isdigit() and int(command_params[0]) == 2:
+            clan_wars_service = self.secondary_clan_wars_service
+        return clan_wars_service
 
     async def invite(self, message: Message) -> None:
         title_emojis = CLAN_BANNER_EMOJI if self.can_use_custom_emojis else ':blue_heart::white_heart::blue_heart:'
@@ -237,7 +264,8 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def cwl(self, message: Message):
-        cwl_group = await self.clan_wars_service.get_current_cwl_group()
+        clan_wars_service = self.get_clan_wars_service(message.content.split())
+        cwl_group = await clan_wars_service.get_current_cwl_group()
         if cwl_group is None:
             content = "Le clan n'est actuellement pas en ligue de guerres de clans"
         else:
@@ -256,7 +284,7 @@ class Bot:
                 )
             )
             content = f'# Ligue de guerre - saison {parse_year_month(cwl_group.season)}\n' + content
-            current_war = await self.clan_wars_service.get_current_war()
+            current_war = await self.get_clan_wars_service(message.content.split()).get_current_war()
             if cwl_group.state == 'inWar' and current_war is not None:
                 content += '\n' + current_war.as_discord_message(self.can_use_custom_emojis, short=True)
         await self.discord_api_client.send_message(message.channel_id, content)
@@ -282,7 +310,8 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def spy_cwl(self, message: Message):
-        current_war = await self.clan_wars_service.get_current_war()
+        clan_wars_service = self.get_clan_wars_service(message.content.split()[1:])
+        current_war = await clan_wars_service.get_current_war()
         if current_war is None or not current_war.is_cwl or current_war.league_day is None:
             await self.discord_api_client.send_message(message.channel_id, 'Aucune ligue de guerre de clans en cours')
             return
@@ -297,10 +326,10 @@ class Bot:
             else:
                 spyed_day += 1
 
-        league_group = await self.clan_wars_service.get_current_cwl_group()
+        league_group = await clan_wars_service.get_current_cwl_group()
         if spyed_day <= len(league_group.rounds):
             for war_tag in league_group.rounds[spyed_day - 1].war_tags:
-                fetched_war = self.clan_wars_service.ended_cwl_wars.get(war_tag)
+                fetched_war = clan_wars_service.ended_cwl_wars.get(war_tag)
                 if fetched_war is None:
                     fetched_war = await self.coc_api_client.get_cwl_war(war_tag)
                 if fetched_war is None:
@@ -328,8 +357,27 @@ class Bot:
             await self.discord_api_client.send_message(message.channel_id, message_content)
 
     @requires_role(ClanRole.MEMBER)
+    async def clan_info(self, message: Message):
+        clan_tag = self.clan_tag
+        params = message.content.split()[1:]
+        if len(params) > 0 and params[0].isdigit():
+            if int(params[0]) == 2 and self.secondary_clan_tag is not None:
+                clan_tag = self.secondary_clan_tag
+            elif int(params[0]) != 1:
+                await self.discord_api_client.send_message(message.channel_id, ':x: Only 2 clans are currently linked.')
+                return
+        clan = await self.coc_api_client.get_clan(clan_tag)
+        if clan is None:
+            content = 'Erreur: clan non trouvé'
+            embeds = []
+        else:
+            content = None
+            embeds = [clan.as_discord_embed()]
+        await self.discord_api_client.send_message(message.channel_id, content, embeds=embeds)
+
+    @requires_role(ClanRole.MEMBER)
     async def war(self, message: Message):
-        current_war = await self.clan_wars_service.get_current_war()
+        current_war = await self.get_clan_wars_service(message.content.split()[1:]).get_current_war()
         if current_war is None:
             content = 'Aucune guerre en cours'
         else:
@@ -375,7 +423,7 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def attacks(self, message: Message):
-        current_war = await self.clan_wars_service.get_current_war()
+        current_war = await self.get_clan_wars_service(message.content.split()).get_current_war()
         if current_war is None:
             await self.discord_api_client.send_message(message.channel_id, 'Aucune guerre en cours')
         else:
@@ -427,6 +475,8 @@ class Bot:
             application_id = CLAN_APPLICATION_ID
         )
         await self.clan_wars_service.get_current_war()
+        if self.secondary_clan_wars_service is not None:
+            await self.secondary_clan_wars_service.get_current_war()
 
     async def on_error(self, e: Exception):
         content = f'**:warning: ERROR**\n```\n{traceback.format_exc()}```'

@@ -66,7 +66,7 @@ class ChannelType(Enum):
 class Message:
     def __init__(self, raw_message: dict) -> None:
         self.id = raw_message['id']
-        self.content = raw_message['content']
+        self.content: str = raw_message['content']
         self.channel_id: str = raw_message['channel_id']
         self.guild_id: Optional[str] = raw_message.get('guild_id')
         self.type = raw_message['type']

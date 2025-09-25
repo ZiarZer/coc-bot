@@ -28,7 +28,7 @@ class ClanMembersService:
             clan_members = await self.coc_api_client.get_clan_members(self.clan_tag)
             members_count = len(clan_members)
             if members_count > 0:
-                if len(self.clan_members) > 0 and members_count != len(self.clan_members) and members_count >= CLAN_MEMBERS_WARNING_THRESHOLD:
+                if 0 < len(self.clan_members) < members_count and members_count >= CLAN_MEMBERS_WARNING_THRESHOLD:
                     warning_message = f'Le Clan est {"bientôt" if members_count < 50 else ""} rempli'
                     await self.discord_api_client.send_message(
                         CLAN_MAIN_CHANNEL_ID,
