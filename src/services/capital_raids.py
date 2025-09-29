@@ -38,7 +38,7 @@ class CapitalRaidsService:
             return self.current_capital_raid_season
         current_season = await self.coc_api_client.get_current_capital_raid_season(self.clan_tag)
         if current_season is not None:
-            if self.on_current_raid_change is not None and self.current_war != current_season:
+            if self.on_current_raid_change is not None and self.current_capital_raid_season != current_season:
                 await self.on_current_raid_change(current_season)
             self.current_capital_raid_season = current_season
             self.raid_last_fetched_at = time()

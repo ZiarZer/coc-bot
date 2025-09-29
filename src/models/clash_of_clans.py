@@ -119,7 +119,7 @@ class WarParticipant:
         townhall = self.str_townhall(use_custom_emojis)
         star = ':star:' if not use_custom_emojis else CUSTOM_EMOJIS['STAR']
         empty_star = '' if not use_custom_emojis else CUSTOM_EMOJIS['EMPTY_STAR']
-        s = f'{townhall} - `{str(self.current_war_position or "?").rjust(2, " ")}. {self.name}`'
+        s = f'{townhall} - ``{str(self.current_war_position or "?").rjust(2, " ")}. {self.name}``'
         if self.best_opponent_attack is not None and self.best_opponent_attack.stars > 0:
             star_emojis = star * self.best_opponent_attack.stars + (3 - self.best_opponent_attack.stars) * empty_star
             s += '(' + star_emojis + f' - {self.best_opponent_attack.destruction_percentage}%)'
