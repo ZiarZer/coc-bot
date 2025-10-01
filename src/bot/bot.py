@@ -260,7 +260,7 @@ class Bot:
         await self.discord_api_client.send_message(message.channel_id, message_content)
 
     def compute_clan_name_str(self, clan: WarClan):
-        return f'**`{clan.name}`**' if clan.tag == self.clan_tag else f'`{clan.name}`'
+        return f'**`{clan.name}`**' if clan.tag in (self.clan_tag, self.secondary_clan_tag) else f'`{clan.name}`'
 
     @requires_role(ClanRole.MEMBER)
     async def cwl(self, message: Message):
@@ -342,7 +342,7 @@ class Bot:
                         "La guerre à espionner n'a pas été trouvée !"
                     )
                     return
-                if fetched_war.clan.tag == self.clan_tag:
+                if fetched_war.clan.tag in (self.clan_tag, self.secondary_clan_tag):
                     r = await asyncio.gather(
                         *(self.compute_spyed_defender_string(m) for m in fetched_war.opponent.members)
                     )
