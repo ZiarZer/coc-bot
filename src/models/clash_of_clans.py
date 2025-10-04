@@ -200,7 +200,7 @@ class War:
         main_info = f'## {title}\n**`{self.clan.name}`** {vs_emoji} `{self.opponent.name}`\n'
 
         if self.state == 'preparation':
-            main_info += f'Début du jour de combat dans : <t:{to_timestamp(self.war_start_time)}:R>'
+            main_info += f'Début du jour de combat : <t:{to_timestamp(self.war_start_time)}:R>'
             return main_info
 
         clan_attacks = f'{self.clan.attacks}/{self.attacks_per_clan}'
@@ -218,7 +218,7 @@ class War:
             else:
                 main_info += f'## {lose_war_emoji} Défaite'
         elif self.state == 'inWar':
-            main_info += f'Fin dans : <t:{to_timestamp(self.end_time)}:R>\n'
+            main_info += f'Fin : <t:{to_timestamp(self.end_time)}:R>\n'
             if short:
                 return main_info
 
@@ -306,7 +306,7 @@ class WarScore:
 
     def add_to_score(self, war_clan: WarClan) -> None:
         self.stars += war_clan.stars
-        self.destruction_percentage += war_clan.destruction_percentage
+        self.destruction_percentage += war_clan.destruction_percentage * len(war_clan.members)
 
     def __str__(self) -> str:
         return f':star: {self.stars} - {int(self.destruction_percentage)}%'
