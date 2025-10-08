@@ -265,7 +265,7 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def cwl(self, message: Message):
-        clan_wars_service = self.get_clan_wars_service(message.content.split())
+        clan_wars_service = self.get_clan_wars_service(message.content.split()[1:])
         cwl_group = await clan_wars_service.get_current_cwl_group()
         if cwl_group is None:
             content = "Le clan n'est actuellement pas en ligue de guerres de clans"
@@ -285,7 +285,7 @@ class Bot:
                 )
             )
             content = f'# Ligue de guerre - saison {parse_year_month(cwl_group.season)}\n' + content
-            current_war = await self.get_clan_wars_service(message.content.split()).get_current_war()
+            current_war = await clan_wars_service.get_current_war()
             if cwl_group.state == 'inWar' and current_war is not None:
                 content += '\n' + current_war.as_discord_message(self.can_use_custom_emojis, short=True)
         await self.discord_api_client.send_message(message.channel_id, content)
@@ -424,7 +424,7 @@ class Bot:
 
     @requires_role(ClanRole.MEMBER)
     async def attacks(self, message: Message):
-        current_war = await self.get_clan_wars_service(message.content.split()).get_current_war()
+        current_war = await self.get_clan_wars_service(message.content.split()[1:]).get_current_war()
         if current_war is None:
             await self.discord_api_client.send_message(message.channel_id, 'Aucune guerre en cours')
         else:
