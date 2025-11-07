@@ -66,7 +66,7 @@ class ClashOfClansApiClient(BaseApiClient):
         league_day = len(cwl_group.rounds)
         for war_tag in cwl_group.rounds[-1].war_tags:
             cwl_war = await self.get_cwl_war(war_tag)
-            if cwl_war is not None and cwl_war.clan.tag == clan_tag:
+            if cwl_war is not None and (cwl_war.clan.tag == clan_tag or cwl_war.opponent.tag == clan_tag):
                 war = cwl_war
                 break
 
@@ -74,12 +74,12 @@ class ClashOfClansApiClient(BaseApiClient):
             league_day -= 1
             for war_tag in cwl_group.rounds[-2].war_tags:
                 cwl_war = await self.get_cwl_war(war_tag)
-                if cwl_war is not None and cwl_war.clan.tag == clan_tag:
+                if cwl_war is not None and (cwl_war.clan.tag == clan_tag or cwl_war.opponent.tag == clan_tag):
                     war = cwl_war
                     break
 
-        log(f'Found war for league day {league_day}', LogLevel.INFO)
         if war is not None:
+            log(f'Found war for league day {league_day}', LogLevel.INFO)
             war.league_day = league_day
         return war
 
