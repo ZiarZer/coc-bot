@@ -104,7 +104,13 @@ class Bot:
 
         # Clan members
         self.clan_members_service = ClanMembersService(self.clan_tag, self.coc_api_client, self.discord_api_client)
-        self.secondary_clan_members_service = ClanMembersService(self.secondary_clan_tag, self.coc_api_client, self.discord_api_client)
+        self.secondary_clan_members_service = None
+        if self.secondary_clan_tag is not None:
+            self.secondary_clan_members_service = ClanMembersService(
+                self.secondary_clan_tag,
+                self.coc_api_client,
+                self.discord_api_client
+            )
 
         commands = [
             Command('claninfo', self.clan_info, aliases=['clan']),

@@ -1,5 +1,6 @@
+PY=env/bin/python
 SRC=src/*.py src/*/*.py
 
-checks:
-	python3 -m mypy $(SRC)
-	python3 -m pycodestyle $(SRC)
+lint:
+	$(PY) -m mypy $(SRC)
+	$(PY) -m pycodestyle $(SRC)

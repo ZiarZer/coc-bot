@@ -28,7 +28,9 @@ def requires_role(role: ClanRole = ClanRole.NOT_MEMBER):
                     reverse=True
                 )
                 if len(eligible_members) == 0:
-                    clan_members = await self.secondary_clan_members_service.get_clan_members(lambda m: m.role.value >= role.value)
+                    clan_members = await self.secondary_clan_members_service.get_clan_members(
+                        lambda m: m.role.value >= role.value
+                    )
                     eligible_members = sorted(
                         (m for m in clan_members if m.tag in player_tags),
                         key=lambda m: m.role.value,
