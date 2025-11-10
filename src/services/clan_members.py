@@ -3,6 +3,7 @@ from typing import Optional, Callable
 
 from models.clash_of_clans import ClanMember
 from clients import ClashOfClansApiClient, DiscordApiClient
+from i18n import __
 from utils import log, LogLevel
 
 
@@ -29,7 +30,7 @@ class ClanMembersService:
             members_count = len(clan_members)
             if members_count > 0:
                 if 0 < len(self.clan_members) < members_count and members_count >= CLAN_MEMBERS_WARNING_THRESHOLD:
-                    warning_message = f'Le Clan est {"bientôt" if members_count < 50 else ""} rempli'
+                    warning_message = __('The Clan is almost full') if members_count < 50 else __('The Clan is full')
                     await self.discord_api_client.send_message(
                         CLAN_MAIN_CHANNEL_ID,
                         f'**:warning: {warning_message} ({members_count}/50)**'

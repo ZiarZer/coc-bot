@@ -1,20 +1,21 @@
 from .logger import log, LogLevel
 from datetime import datetime, timezone
+from i18n import __
 
 
-FRENCH_MONTHS = [
-    'Janvier',
-    'Février',
-    'Mars',
-    'Avril',
-    'Mai',
-    'Juin',
-    'Juillet',
-    'Août',
-    'Septembre',
-    'Octobre',
-    'Novembre',
-    'Décembre'
+MONTH_NAMES = [
+    __('January'),
+    __('February'),
+    __('March'),
+    __('April'),
+    __('May'),
+    __('June'),
+    __('July'),
+    __('August'),
+    __('September'),
+    __('October'),
+    __('November'),
+    __('December')
 ]
 
 
@@ -45,5 +46,5 @@ def format_number(n: int) -> str:
 def parse_year_month(year_month_str: str) -> str:
     # month_year_str format: 2025-01 (month is 01-indexed)
     year, month = year_month_str.split('-')
-    month = FRENCH_MONTHS[int(month) - 1]
+    month = MONTH_NAMES[int(month) - 1]
     return f'{month} {year}'

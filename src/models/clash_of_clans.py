@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional
+from i18n import __
 from utils import to_timestamp, format_number
 from .discord import PresenceActivity, embed
 
@@ -83,10 +84,9 @@ class CapitalRaidSeason:
         if self.state != 'ongoing':
             return None
         return PresenceActivity(
-            f'Week-end de Raids',
+            __('Raid weekend'),
             5,
-            # f'Contre {self.current_war.opponent.name}',
-            state=f'{format_number(self.capital_total_loot)} joyaux récoltés',
+            state=__('%1 capital gold obtained', format_number(self.capital_total_loot)),
             end_timestamp = 1000 * to_timestamp(self.end_time),
             application_id = WEEKEND_RAID_APPLICATION_ID
         )
@@ -134,7 +134,7 @@ class WarParticipant:
     def str_townhall(self, use_custom_emojis) -> str:
         if use_custom_emojis and self.townhall_level in TOWNHALL_CUSTOM_EMOJIS:
             return f'<:th{self.townhall_level}:{TOWNHALL_CUSTOM_EMOJIS[self.townhall_level]}>'
-        return f'TH{self.townhall_level}'
+        return __('TH%1', self.townhall_level)
 
 
 class WarClan:
@@ -193,14 +193,14 @@ class War:
         win_war_emoji = ':mechanical_arm:' if not use_custom_emojis else CUSTOM_EMOJIS['WIN_WAR']
 
         if self.state == 'notInWar':
-            return 'Aucune guerre en cours'
-        title = 'GDC actuelle'
+            return __('No ongoing war')
+        title = __('Current clan war')
         if self.league_day is not None:
-            title += f' - Jour {self.league_day} de Ligue'
+            title += ' - ' + __('CWL Day %1', self.league_day)
         main_info = f'## {title}\n**`{self.clan.name}`** {vs_emoji} `{self.opponent.name}`\n'
 
         if self.state == 'preparation':
-            main_info += f'Début du jour de combat : <t:{to_timestamp(self.war_start_time)}:R>'
+            main_info += __('Battle day start: %1', f'<t:{to_timestamp(self.war_start_time)}:R>')
             return main_info
 
         clan_attacks = f'{self.clan.attacks}/{self.attacks_per_clan}'
@@ -212,13 +212,13 @@ class War:
             star_diff = self.clan.stars - self.opponent.stars
             percentage_diff = self.clan.destruction_percentage - self.opponent.destruction_percentage
             if star_diff == 0 and percentage_diff == 0:
-                main_info += '## :handshake: Égalité'
+                main_info += f'## :handshake: {__('Draw')}'
             elif star_diff > 0 or (star_diff == 0 and percentage_diff > 0):
-                main_info += f'## {win_war_emoji} Victoire'
+                main_info += f'## {win_war_emoji} {__('Win')}'
             else:
-                main_info += f'## {lose_war_emoji} Défaite'
+                main_info += f'## {lose_war_emoji} {__('Lose')}'
         elif self.state == 'inWar':
-            main_info += f'Fin : <t:{to_timestamp(self.end_time)}:R>\n'
+            main_info += __('End: %1', f'<t:{to_timestamp(self.end_time)}:R>') + '\n'
             if short:
                 return main_info
 
@@ -228,11 +228,11 @@ class War:
                 if m.best_opponent_attack is None or m.best_opponent_attack.stars < 3
             ]
             if len(uncleared_bases) == 0:
-                main_info += '\n:white_check_mark: Tous les villages ennemis détruits à 100%'
+                main_info += f'\n:white_check_mark: {__('All enemy villages cleared to 100%')}'
                 return main_info
 
             uncleared_bases_str = '\n'.join(uncleared_bases)
-            main_info += f'\n**Villages ennemis restants :**\n{uncleared_bases_str}\n'
+            main_info += f'\n**{__('Remaining ennemy villages:')}**\n{uncleared_bases_str}\n'
             missing_attacks = [
                 m.missing_attacks_str(self.attacks_per_member, use_custom_emojis)
                 for m in self.clan.members
@@ -240,9 +240,9 @@ class War:
             ]
             if len(missing_attacks) > 0:
                 missing_attacks_str = '   **;**   '.join(missing_attacks)
-                main_info += f'\n**Attaques restantes :**\n{missing_attacks_str}\n'
+                main_info += f'\n**{__('Remaining attacks:')}**\n{missing_attacks_str}\n'
             else:
-                main_info += '\n:white_check_mark: **Aucune attaque restante**'
+                main_info += f'\n:white_check_mark: **{__('No remaining attack')}**'
 
         return main_info
 
@@ -251,20 +251,20 @@ class War:
             return None
 
         if self.state == 'preparation':
-            activity_state = 'Préparation'
+            activity_state = __('Preparation')
         else:
             activity_state = f'{self.clan.stars} ★ {self.opponent.stars}'
-        activity_details = f'Contre {self.opponent.name}'
+        activity_details = __('Against %1', self.opponent.name)
         if self.state == 'warEnded':
             star_diff = self.clan.stars - self.opponent.stars
             percentage_diff = self.clan.destruction_percentage - self.opponent.destruction_percentage
-            activity_details = 'Défaite'
+            activity_details = __('Lose')
             if star_diff == 0 and percentage_diff == 0:
-                activity_details = 'Égalité'
+                activity_details = __('Draw')
             elif star_diff > 0 or (star_diff == 0 and percentage_diff > 0):
-                activity_details = 'Victoire'
+                activity_details = __('Win')
         return PresenceActivity(
-            f'Guerre de Clans - Jour {self.league_day} de Ligue' if self.is_cwl else 'Guerre de Clans',
+            f'{__('Clan War')} - {__('CWL Day %1', self.league_day)}' if self.is_cwl else __('Clan War'),
             5,
             activity_details,
             activity_state,
@@ -277,9 +277,9 @@ class War:
             return None
         end_timestamp = to_timestamp(self.end_time) + 25 * 3600 * (7 - (self.league_day or 0))
         return PresenceActivity(
-            'Ligue de Guerre de Clans',
+            __('Clan War League'),
             5,
-            f'Jour {self.league_day}',
+            __('Day %1', self.league_day),
             end_timestamp = 1000 * end_timestamp,
             application_id = CWL_APPLICATION_ID
         )

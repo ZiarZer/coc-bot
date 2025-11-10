@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 import traceback
 from time import time
 import re
@@ -11,6 +12,7 @@ from models.discord import Message, ChannelType, User, PresenceActivity
 from clients import DiscordGatewayClient, ClashOfClansApiClient, DiscordApiClient
 from repositories import CommandUsesRepository, DiscordCocLinksRepository, TroopGiversRepository, WhitelistsRepository
 from services import ClanMembersService, ClanWarsService, CapitalRaidsService
+from i18n import __
 from utils import to_timestamp, parse_year_month, log, LogLevel
 
 from .custom_pings import parse_custom_ping
@@ -18,7 +20,7 @@ from .commands import Command, requires_role
 
 
 APP_NAME = 'coc-bot'
-APP_VERSION = '0.3.0'
+APP_VERSION = '0.3.1'
 
 CLAN_BANNER_EMOJI = '<:The3200Club:1393849123341340814>'
 
@@ -135,7 +137,8 @@ class Bot:
 
             Command('todo', self.todo, hidden=True),
         ]
-        self.help_message = 'commands:\n' + '\n'.join([c.help_entry(self.prefix) for c in commands if not c.hidden])
+        help_entries = '\n'.join([c.help_entry(self.prefix) for c in commands if not c.hidden])
+        self.help_message = f'{__('commands:')}\n{help_entries}'
         self.commands: dict[str, Command] = {}
         for command in commands:
             self.commands[command.name] = command
@@ -184,19 +187,21 @@ class Bot:
         title = f'{title_emojis} **The 3200 Club** {title_emojis}'
         await self.discord_api_client.send_message(
             message.channel_id,
-            f'## Rejoins le Clan : `{self.clan_tag}`\n{title}\n{self.clan_invite_link}'
+            f'## {__('Join the Clan: `%1`', self.clan_tag)}\n{title}\n{self.clan_invite_link}'
         )
 
     async def whitelist_channel(self, message: Message) -> None:
         self.whitelists_repository.insert_whitelist(message.channel_id, 'CHANNEL')
-        await self.discord_api_client.send_message(message.channel_id, ':white_check_mark: Channel whitelisté')
+        info_message = __('Channel added to whitelist')
+        await self.discord_api_client.send_message(message.channel_id, f':white_check_mark: {info_message}')
 
     async def whitelist_guild(self, message: Message) -> None:
         if message.guild_id is None:
             log(f'Aborted whitelist_guild command, message has no guild ID.', LogLevel.INFO)
             return
         self.whitelists_repository.insert_whitelist(message.guild_id, 'GUILD')
-        await self.discord_api_client.send_message(message.channel_id, ':white_check_mark: Serveur whitelisté')
+        info_message = __('Server added to whitelist')
+        await self.discord_api_client.send_message(message.channel_id, f':white_check_mark: {info_message}')
 
     @requires_role(ClanRole.MEMBER)
     async def troops(self, message: Message):
@@ -216,13 +221,14 @@ class Bot:
         if len(snowflakes) == 0:
             await self.discord_api_client.send_message(
                 message.channel_id,
-                f'There are currently no troop givers. Use the `{self.prefix}troopgiver` command to add one.'
+                __('There are currently no troop givers. Use the `%1` command to add one.', f'{self.prefix}troopgiver')
             )
             return
         pings = '** ; **'.join([f'<@{snowflake}>' for snowflake in snowflakes])
-        response_content = f'{message.author} a besoin de tdc\n||{pings}||'
+        response_content = __('%1 needs troops', message.author)
         if message.content.startswith(f'{self.prefix}tdc'):
-            response_content = f'{message.author} a lancé une ALERTE TDC !!!!!!!!!!!\n||{pings}||'
+            response_content = __('%1 has launched a TDC ALERT!!!!!!!!!!!', message.author)
+        response_content += f'\n||{pings}||'
         await self.discord_api_client.send_message(message.channel_id, response_content)
 
     @requires_role(ClanRole.COLEADER)
@@ -232,7 +238,7 @@ class Bot:
         if len(params) == 0:
             await self.discord_api_client.send_message(
                 message.channel_id,
-                f'Usage: `{self.prefix}troopgiver <Discord-User-ID>`'
+                __('Usage: `%1 <Discord-User-ID>`', f'{self.prefix}troopgiver')
             )
             return
         added_troop_givers = []
@@ -241,9 +247,9 @@ class Bot:
                 self.troop_givers_repository.insert_troop_giver(param, True)
                 added_troop_givers.append(param)
         if len(added_troop_givers) == 0:
-            message_content = "Aucun des IDs donnés n'est lié au compte COC d'un membre du clan"
+            message_content = __('None of the given IDs is linked to the COC account of a member of the clan')
         else:
-            message_content = 'Donneurs de troupes ajoutés : ' + ', '.join(added_troop_givers)
+            message_content = __('Troop givers added: %1', ', '.join(added_troop_givers))
         await self.discord_api_client.send_message(message.channel_id, message_content)
 
     # TODO: code duped from add_troop_giver with few changes, should refactor
@@ -253,7 +259,7 @@ class Bot:
         if len(params) == 0:
             await self.discord_api_client.send_message(
                 message.channel_id,
-                f'Usage: `{self.prefix}removetroopgiver <Discord-User-ID>`'
+                __('Usage: `%1 <Discord-User-ID>`', f'{self.prefix}removetroopgiver')
             )
         removed_troop_givers = []
         for param in params:
@@ -261,9 +267,9 @@ class Bot:
                 self.troop_givers_repository.insert_troop_giver(param, False)
                 removed_troop_givers.append(param)
         if len(removed_troop_givers) == 0:
-            message_content = "Aucun des IDs donnés n'est lié au compte COC d'un membre du clan"
+            message_content = __('None of the given IDs is linked to the COC account of a member of the clan')
         else:
-            message_content = 'Donneurs de troupes retirés : ' + ', '.join(removed_troop_givers)
+            message_content = __('Troop givers removed: %1', ', '.join(removed_troop_givers))
         await self.discord_api_client.send_message(message.channel_id, message_content)
 
     def compute_clan_name_str(self, clan: WarClan):
@@ -274,7 +280,7 @@ class Bot:
         clan_wars_service = self.get_clan_wars_service(message.content.split()[1:])
         cwl_group = await clan_wars_service.get_current_cwl_group()
         if cwl_group is None:
-            content = "Le clan n'est actuellement pas en ligue de guerres de clans"
+            content = __('The clan is currently not in a Clan War League')
         else:
             scores = sorted(
                 cwl_group.clan_scores.items(),
@@ -290,7 +296,8 @@ class Bot:
                     )
                 )
             )
-            content = f'# Ligue de guerre - saison {parse_year_month(cwl_group.season)}\n' + content
+            title = __('Clan War League - Season %1', parse_year_month(cwl_group.season))
+            content = f'# {title}\n{content}'
             current_war = await clan_wars_service.get_current_war()
             if cwl_group.state == 'inWar' and current_war is not None:
                 content += '\n' + current_war.as_discord_message(self.can_use_custom_emojis, short=True)
@@ -320,14 +327,14 @@ class Bot:
         clan_wars_service = self.get_clan_wars_service(message.content.split()[1:])
         current_war = await clan_wars_service.get_current_war()
         if current_war is None or not current_war.is_cwl or current_war.league_day is None:
-            await self.discord_api_client.send_message(message.channel_id, 'Aucune ligue de guerre de clans en cours')
+            await self.discord_api_client.send_message(message.channel_id, __('No ongoing clan war league'))
             return
         spyed_day = current_war.league_day
         if current_war.state == 'inWar' and spyed_day < 7:
             if current_war.league_day == 7:
                 await self.discord_api_client.send_message(
                     message.channel_id,
-                    'Le clan fait déjà son dernier jour de ligue, aucune guerre à espionner'
+                    __('The clan is already in their last league day, there is no war to spy')
                 )
                 return
             else:
@@ -346,21 +353,25 @@ class Bot:
                     )
                     await self.discord_api_client.send_message(
                         message.channel_id,
-                        "La guerre à espionner n'a pas été trouvée !"
+                        __('The war to spy was not found!')
                     )
                     return
                 if fetched_war.clan.tag in (self.clan_tag, self.secondary_clan_tag):
                     r = await asyncio.gather(
                         *(self.compute_spyed_defender_string(m) for m in fetched_war.opponent.members)
                     )
-                    message_content = f'## Clan adverse du jour {spyed_day} de ligue (prévisions)\n'
+                    title = __('Opponent clan of League Day %1 (previsions)', spyed_day)
                     defenders_string = '\n'.join(r)
-                    message_content += f'Contre `{fetched_war.opponent.name}`\n{defenders_string}\n'
-                    message_content += '-# :warning: Le clan adverse peut changer sa composition à tout moment avant '
-                    message_content += f'<t:{to_timestamp(fetched_war.war_start_time)}>'
+                    warning_message = __(
+                        'The opponent clan can change their composition anytime before %1',
+                        f'<t:{to_timestamp(fetched_war.war_start_time)}>'
+                    )
+                    message_content = f'## {title}\n'
+                    message_content += __('Against `%1`', fetched_war.opponent.name)
+                    message_content += f'\n{defenders_string}\n-# :warning: {warning_message}'
                     await self.discord_api_client.send_message(message.channel_id, message_content)
         else:
-            message_content = f'Le jour {spyed_day} ne peut pas encore être espionné'
+            message_content = __("Day %1 can't be spyed yet", spyed_day)
             await self.discord_api_client.send_message(message.channel_id, message_content)
 
     @requires_role(ClanRole.MEMBER)
@@ -371,11 +382,14 @@ class Bot:
             if int(params[0]) == 2 and self.secondary_clan_tag is not None:
                 clan_tag = self.secondary_clan_tag
             elif int(params[0]) != 1:
-                await self.discord_api_client.send_message(message.channel_id, ':x: Only 2 clans are currently linked.')
+                await self.discord_api_client.send_message(
+                    message.channel_id,
+                    f':x: {__('Only 2 clans are currently linked.')}'
+                )
                 return
         clan = await self.coc_api_client.get_clan(clan_tag)
         if clan is None:
-            content = 'Erreur: clan non trouvé'
+            content = __('Error: clan not found')
             embeds = []
         else:
             content = None
@@ -386,7 +400,7 @@ class Bot:
     async def war(self, message: Message):
         current_war = await self.get_clan_wars_service(message.content.split()[1:]).get_current_war()
         if current_war is None:
-            content = 'Aucune guerre en cours'
+            content = __('No ongoing war')
         else:
             content = current_war.as_discord_message(self.can_use_custom_emojis)
         await self.discord_api_client.send_message(message.channel_id, content)
@@ -425,30 +439,32 @@ class Bot:
             else:
                 plain_coc_nicknames.append(f'`{member.name}`')
         mentions = plain_coc_nicknames + discord_mentions
-        pings = ('\n**Mentions :**\n||' + '** ; **'.join(mentions) + '||') if len(mentions) else ''
+        pings = (f'\n**{__('Mentions:')}**\n||' + '** ; **'.join(mentions) + '||') if len(mentions) else ''
         await self.discord_api_client.send_message(message.channel_id, f'{rest}\n{pings}')
 
     @requires_role(ClanRole.MEMBER)
     async def attacks(self, message: Message):
         current_war = await self.get_clan_wars_service(message.content.split()[1:]).get_current_war()
         if current_war is None:
-            await self.discord_api_client.send_message(message.channel_id, 'Aucune guerre en cours')
+            await self.discord_api_client.send_message(message.channel_id, __('No ongoing war'))
         else:
             missing_attacks = [
                 m.missing_attacks_str(current_war.attacks_per_member, self.can_use_custom_emojis, True)
                 for m in current_war.clan.members
                 if len(m.attacks) <current_war.attacks_per_member
             ]
-            missing_attacks_str = '**Attaques restantes:**\n' + '\n'.join(missing_attacks)
-            missing_attacks_str += f'\n\n_Fin de la guerre : <t:{to_timestamp(current_war.end_time)}:R>_'
+            missing_attacks_str = f'**{__('Remaining attacks')}:**\n' + '\n'.join(missing_attacks)
+            missing_attacks_str += f'\n\n_{__('War end: %1', f'<t:{to_timestamp(current_war.end_time)}:R>')}_'
             await self.discord_api_client.send_message(message.channel_id, missing_attacks_str)
 
     async def help(self, message: Message) -> None:
         await self.discord_api_client.send_message(message.channel_id, self.help_message)
 
     async def about(self, message: Message) -> None:
-        info = f'- {APP_NAME} v{APP_VERSION}\n- Running on Python 3.12\n- Last restart: <t:{int(self.started_at)}:R>'
-        info += '\n- https://www.github.com/ZiarZer/coc-bot'
+        info = f'- {APP_NAME} v{APP_VERSION}\n'
+        info += f'- {__('Running on %1', f'Python {sys.version_info.major}.{sys.version_info.minor}')}\n'
+        info += f'- {__('Last restart: %1', f'<t:{int(self.started_at)}:R>')}\n'
+        info += '- https://www.github.com/ZiarZer/coc-bot'
         await self.discord_api_client.send_message(message.channel_id, info)
 
     @requires_role(ClanRole.LEADER)
