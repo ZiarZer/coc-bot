@@ -1,3 +1,4 @@
+from time import time
 from enum import Enum
 from typing import Optional
 from i18n import __
@@ -195,13 +196,14 @@ class War:
         if self.state == 'notInWar':
             return __('No ongoing war')
         title = __('Current clan war')
+        last_update_time_footer = f'\n-# {__('Last updated: %1', f'<t:{int(time())}:R>')}'
         if self.league_day is not None:
             title += ' - ' + __('CWL Day %1', self.league_day)
         main_info = f'## {title}\n**`{self.clan.name}`** {vs_emoji} `{self.opponent.name}`\n'
 
         if self.state == 'preparation':
             main_info += __('Battle day start: %1', f'<t:{to_timestamp(self.war_start_time)}:R>')
-            return main_info
+            return main_info + last_update_time_footer
 
         clan_attacks = f'{self.clan.attacks}/{self.attacks_per_clan}'
         opponent_attacks = f'{self.opponent.attacks}/{self.attacks_per_clan}'
@@ -229,7 +231,7 @@ class War:
             ]
             if len(uncleared_bases) == 0:
                 main_info += f'\n:white_check_mark: {__('All enemy villages cleared to 100%')}'
-                return main_info
+                return main_info + last_update_time_footer
 
             uncleared_bases_str = '\n'.join(uncleared_bases)
             main_info += f'\n**{__('Remaining ennemy villages:')}**\n{uncleared_bases_str}\n'
@@ -244,7 +246,7 @@ class War:
             else:
                 main_info += f'\n:white_check_mark: **{__('No remaining attack')}**'
 
-        return main_info
+        return main_info + last_update_time_footer
 
     def build_presence_activity(self) -> Optional[PresenceActivity]:
         if self.state not in ('inWar', 'preparation', 'warEnded'):

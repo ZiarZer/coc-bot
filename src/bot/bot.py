@@ -154,7 +154,6 @@ class Bot:
             if message.id == self.up_to_date_message_id:
                 continue
             new_content = war.as_discord_message(self.can_use_custom_emojis)
-            new_content += f'\n-# {__('Last updated: %1', f'<t:{int(time())}:R>')}'
             await self.discord_api_client.edit_message(message.channel_id, message.id, new_content)
             sleep(1.5)
         if war.state == 'ended':
