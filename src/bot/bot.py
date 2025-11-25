@@ -2,7 +2,7 @@ import asyncio
 import os
 import sys
 import traceback
-from time import time
+from time import time, sleep
 import re
 from typing import Optional
 from dotenv import load_dotenv
@@ -28,12 +28,10 @@ TODO = [
     'multi-clans',
     'migration',
     'embeds',
-    '>troops th16 / >tdc hdv16 / >tdc 16'
 
     'erase cached info when not needed anymore (no longer save cwl wars when cwl ends for example)',
     'add clan games activity when event is active',
     'custom timer (not discord)',
-    'translations',
 
     'command to init clan by server (to remove hardcoded vars)'
 
@@ -95,6 +93,8 @@ class Bot:
                 self.coc_api_client,
                 self.discord_api_client
             )
+        self.war_summary_messages: dict[str, list[Message]] = {}
+        self.up_to_date_message_id: Optional[str] = None
 
         # Capital raids
         self.capital_raids_service = CapitalRaidsService(
@@ -150,6 +150,15 @@ class Bot:
         await self.discord_gateway_client.run()
 
     async def on_current_war_change(self, war: War):
+        for channel_id in self.war_summary_messages:
+            for message in self.war_summary_messages[channel_id]:
+                if message.id == self.up_to_date_message_id:
+                    continue
+                await self.discord_api_client.edit_message(channel_id, message.id, war.as_discord_message(self.can_use_custom_emojis))
+                sleep(1.5)
+        if war.state == 'ended':
+            self.war_summary_messages = {}
+
         # TODO: should be done async to not block return
         self.activities['WAR'] = war.build_presence_activity()
         if war.is_cwl:
@@ -403,7 +412,12 @@ class Bot:
             content = __('No ongoing war')
         else:
             content = current_war.as_discord_message(self.can_use_custom_emojis)
-        await self.discord_api_client.send_message(message.channel_id, content)
+            if message.channel_id not in self.war_summary_messages:
+                self.war_summary_messages[message.channel_id] = []
+        sent_message = await self.discord_api_client.send_message(message.channel_id, content)
+        self.up_to_date_message_id = sent_message.id
+        self.war_summary_messages[message.channel_id].append(sent_message)
+        return sent_message
 
     @requires_role(ClanRole.LEADER)
     async def announce(self, message: Message):
