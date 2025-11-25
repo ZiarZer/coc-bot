@@ -504,7 +504,7 @@ class Bot:
 
     async def on_ready(self, data: dict):
         self.user = User(data['user'])
-        self.can_use_custom_emojis = self.user.is_bot or self.user.has_nitro
+        self.can_use_custom_emojis = self.user.has_nitro
         self.activities['CLAN'] = PresenceActivity(
             'The 3200 Club',  # TODO: fetch clan info
             0,
