@@ -22,6 +22,7 @@ FR_LOCALE = {
     'July': 'Juillet',
     'June': 'Juin',
     'Last restart: %1': 'Dernier redémarrage : %1',
+    'Last updated: %1': 'Dernière mise à jour : %1',
     'Lose': 'Défaite',
     'March': 'Mars',
     'May': 'Mai',
