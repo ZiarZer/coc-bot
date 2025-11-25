@@ -93,7 +93,7 @@ class Bot:
                 self.coc_api_client,
                 self.discord_api_client
             )
-        self.war_summary_messages: dict[str, list[Message]] = {}
+        self.war_summary_messages: list[Message] = []
         self.up_to_date_message_id: Optional[str] = None
 
         # Capital raids
@@ -150,14 +150,15 @@ class Bot:
         await self.discord_gateway_client.run()
 
     async def on_current_war_change(self, war: War):
-        for channel_id in self.war_summary_messages:
-            for message in self.war_summary_messages[channel_id]:
-                if message.id == self.up_to_date_message_id:
-                    continue
-                await self.discord_api_client.edit_message(channel_id, message.id, war.as_discord_message(self.can_use_custom_emojis))
-                sleep(1.5)
+        for message in self.war_summary_messages[-10:]:
+            if message.id == self.up_to_date_message_id:
+                continue
+            new_content = war.as_discord_message(self.can_use_custom_emojis)
+            new_content += f'\n-# {__('Last updated: %1', f'<t:{int(time())}:R>')}'
+            await self.discord_api_client.edit_message(message.channel_id, message.id, new_content)
+            sleep(1.5)
         if war.state == 'ended':
-            self.war_summary_messages = {}
+            self.war_summary_messages = []
 
         # TODO: should be done async to not block return
         self.activities['WAR'] = war.build_presence_activity()
@@ -412,12 +413,10 @@ class Bot:
             content = __('No ongoing war')
         else:
             content = current_war.as_discord_message(self.can_use_custom_emojis)
-            if message.channel_id not in self.war_summary_messages:
-                self.war_summary_messages[message.channel_id] = []
         sent_message = await self.discord_api_client.send_message(message.channel_id, content)
-        self.up_to_date_message_id = sent_message.id
-        self.war_summary_messages[message.channel_id].append(sent_message)
-        return sent_message
+        if sent_message is not None:
+            self.up_to_date_message_id = sent_message.id
+            self.war_summary_messages.append(sent_message)
 
     @requires_role(ClanRole.LEADER)
     async def announce(self, message: Message):
