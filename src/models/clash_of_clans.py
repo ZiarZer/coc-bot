@@ -347,9 +347,11 @@ class Clan:
         self.name: str = raw_clan['name']
         self.badge_url: str = raw_clan['badgeUrls']['large']
 
+    def get_invite_link(self) -> str:
+        return f'https://link.clashofclans.com/fr?action=OpenClanProfile&tag={self.tag}'
+
     def as_discord_embed(self) -> embed.Embed:
-        invite_link = f'https://link.clashofclans.com/fr?action=OpenClanProfile&tag={self.tag}'
-        return embed.Embed(self.name, self.tag, url=invite_link).set_thumbnail(self.badge_url)
+        return embed.Embed(self.name, self.tag, url=self.get_invite_link()).set_thumbnail(self.badge_url)
 
 
 class Player:
