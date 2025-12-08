@@ -81,6 +81,11 @@ class ClashOfClansApiClient(BaseApiClient):
         if war is not None:
             log(f'Found war for league day {league_day}', LogLevel.INFO)
             war.league_day = league_day
+            if war.clan.tag != clan_tag:
+                tmp = war.clan
+                war.clan = war.opponent
+                war.opponent = tmp
+
         return war
 
     async def get_clan(self, clan_tag: str) -> Optional[Clan]:
