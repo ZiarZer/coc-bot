@@ -3,12 +3,13 @@ import asyncio
 from dotenv import load_dotenv
 from bot import Bot
 from utils import log
+from typing import Literal
 
 
 load_dotenv()
-CLAN_TAG = '#2GLCQ00G0'
-SECONDARY_CLAN_TAG = '#2JG02GVYL'
-
+CLAN_TAG = os.environ.get('CLAN_TAG', '#2GLCQ00G0')
+SECONDARY_CLAN_TAG = os.environ.get('SECONDARY_CLAN_TAG', '#2JG02GVYL')
+ENV: Literal['DEV'] | Literal['PROD'] = os.environ.get('ENV', 'DEV')
 
 async def main():
     log('bouliste2clan - \033[4mhttps://www.github.com/ZiarZer/bouliste2clan\033[0m')
@@ -19,7 +20,9 @@ async def main():
 
     COC_API_TOKEN = os.environ.get('COC_API_TOKEN')
 
-    bot = Bot(CLAN_TAG, discord_auth_token, COC_API_TOKEN, secondary_clan_tag=SECONDARY_CLAN_TAG)
+    prefix = '>' if ENV == 'PROD' else '£'
+
+    bot = Bot(CLAN_TAG, discord_auth_token, COC_API_TOKEN, prefix, SECONDARY_CLAN_TAG)
     await bot.run()
 
 

@@ -56,7 +56,7 @@ class Bot:
         clan_tag: str,
         discord_auth_token: str,
         coc_api_token: str,
-        prefix = '>',
+        prefix: str,
         secondary_clan_tag: Optional[str] = None
     ) -> None:
         self.discord_coc_links_repository = DiscordCocLinksRepository()
