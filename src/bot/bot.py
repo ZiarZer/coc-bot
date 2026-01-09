@@ -136,6 +136,7 @@ class Bot:
             Command('about', self.about),
 
             Command('todo', self.todo, hidden=True),
+            Command('updateicon', self.update_icon, hidden=True),
         ]
         help_entries = '\n'.join([c.help_entry(self.prefix) for c in commands if not c.hidden])
         self.help_message = f'{__('commands:')}\n{help_entries}'
@@ -483,6 +484,16 @@ class Bot:
     async def todo(self, _) -> None:
         if BACKOFFICE_CHANNEL_ID is not None:
             await self.discord_api_client.send_message(BACKOFFICE_CHANNEL_ID, '\n'.join(map(lambda t: f'- {t}', TODO)))
+
+    @requires_role(ClanRole.COLEADER)
+    async def update_icon(self, message: Message) -> None:
+        clan = await self.coc_api_client.get_clan(self.clan_tag)
+        if clan is None:
+            await self.discord_api_client.send_message(message.channel_id, __('Error: clan not found'))
+            return
+        updated_guild = await self.discord_api_client.modify_guild('1421972230220546080', icon_url=clan.badge_url)
+        if updated_guild is not None:  # Successfully set icon
+            await self.discord_api_client.react_message(message.channel_id, message.id, '✅')
 
     async def handle_command(self, message: Message) -> None:
         if message.author.id == self.user.id:

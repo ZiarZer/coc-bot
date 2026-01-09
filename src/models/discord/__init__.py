@@ -79,6 +79,11 @@ class Message:
             self.channel_type = ChannelType(channel_type_code)
 
 
+class Guild:
+    def __init__(self, raw_guild) -> None:
+        self.name = raw_guild['name']
+        self.icon = raw_guild['icon']
+
 class PresenceActivity:
     def __init__(
         self,

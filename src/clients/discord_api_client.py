@@ -2,8 +2,9 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 
-from models.discord import Message, embed
+from models.discord import Message, Guild, embed
 from .base_api_client import BaseApiClient
+from utils import get_base64_image_from_url
 
 
 DISCORD_API_BASE_URL = 'https://discord.com/api/v10'
@@ -56,4 +57,19 @@ class DiscordApiClient(BaseApiClient):
         response = await self.PATCH(f'channels/{channel_id}/messages/{message_id}', body)
         if response.status_code == 200:
             return Message(response.json())
+        return None
+
+    async def react_message(self, channel_id: str, message_id: str, emoji: str) -> bool:
+        response = await self.PUT(f'channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me')
+        return response.status_code == 204
+
+    async def modify_guild(self, guild_id, name = None, icon_url = None) -> Optional[Guild]:
+        body: dict = {}
+        if name is not None:
+            body['name'] = name
+        if icon_url is not None:
+            body['icon'] = get_base64_image_from_url(icon_url)  # Should not update if cannot convert icon URL
+        response = await self.PATCH(f'guilds/{guild_id}', body)
+        if response.status_code == 200:
+            return Guild(response.json())
         return None

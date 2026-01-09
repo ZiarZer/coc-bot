@@ -1,5 +1,8 @@
 from .logger import log, LogLevel
 from datetime import datetime, timezone
+from base64 import b64encode
+from typing import Optional
+import requests
 from i18n import __
 
 
@@ -48,3 +51,21 @@ def parse_year_month(year_month_str: str) -> str:
     year, month = year_month_str.split('-')
     month = MONTH_NAMES[int(month) - 1]
     return f'{month} {year}'
+
+
+def get_base64_image_from_url(url: str) -> Optional[str]:
+    if url.endswith('.gif'):
+        result = 'data:image/gif'
+    elif url.endswith('.jpeg') or url.endswith('.jpg'):
+        result = 'data:image/jpeg'
+    elif url.endswith('.png'):
+        result = 'data:image/png'
+    else:
+        log(
+            f'Cannot convert image to base 64: URL {url} does not end with a JPEG, PNG, or GIF extension',
+            LogLevel.WARNING
+        )
+        return None
+    result += ';base64,'
+    result += b64encode(requests.get(url).content).decode('utf-8')
+    return result
