@@ -409,11 +409,15 @@ class Bot:
     @requires_role(ClanRole.MEMBER)
     async def war(self, message: Message):
         current_war = await self.get_clan_wars_service(message.content.split()[1:]).get_current_war()
+        content, war_embed = None, None
         if current_war is None:
             content = __('No ongoing war')
         else:
-            content = current_war.as_discord_message(self.can_use_custom_emojis)
-        sent_message = await self.discord_api_client.send_message(message.channel_id, content)
+            war_embed = current_war.as_discord_embed(self.can_use_custom_emojis)
+        if war_embed is None:
+            sent_message = await self.discord_api_client.send_message(message.channel_id, content)
+        else:
+            sent_message = await self.discord_api_client.send_message(message.channel_id, embeds=[war_embed])
         if sent_message is not None:
             self.up_to_date_message_id = sent_message.id
             self.war_summary_messages.append(sent_message)

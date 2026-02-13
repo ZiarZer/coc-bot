@@ -29,7 +29,7 @@ class DiscordApiClient(BaseApiClient):
     async def send_message(
         self,
         channel_id: str,
-        content: Optional[str],
+        content: Optional[str] = None,
         embeds: Optional[list[embed.Embed]] = None
     ) -> Optional[Message]:
         sent_content = format_message_content_for_env(content)

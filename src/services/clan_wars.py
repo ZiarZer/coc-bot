@@ -48,9 +48,17 @@ class ClanWarsService:
                 self.war_fetch_next_task.cancel()
             duration = 3600
             if current_war.state == 'preparation':
-                duration = to_timestamp(current_war.war_start_time) - int(time()) + 300
+                war_start_timestamp = to_timestamp(current_war.war_start_time)
+                if war_start_timestamp < int(time()):
+                    duration = 120
+                else:
+                    duration = to_timestamp(current_war.war_start_time) - int(time()) + 300
             elif current_war.state == 'inWar' and to_timestamp(current_war.end_time) - int(time()) < 3600:
-                duration = to_timestamp(current_war.end_time) - int(time()) + 300
+                war_end_timestamp = to_timestamp(current_war.end_time)
+                if war_end_timestamp < int(time()):
+                    duration = 120
+                else:
+                    duration = to_timestamp(current_war.end_time) - int(time()) + 300
             event_loop = asyncio.get_event_loop()
             self.war_fetch_next_task = event_loop.call_later(duration, self.create_next_war_fetch_task)
         return current_war

@@ -17,6 +17,7 @@ def add_ending_semicolon(translated_key):
         return f'{translated_key} :'
     return f'{translated_key}:'
 
+
 def __(key: str, *args) -> str:
     real_key = key
     if key.endswith(':'):

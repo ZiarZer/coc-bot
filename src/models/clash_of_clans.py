@@ -1,4 +1,5 @@
 from time import time
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 from i18n import __
@@ -248,6 +249,80 @@ class War:
 
         return main_info + last_update_time_footer
 
+    def as_discord_embed(self, use_custom_emojis, short = False) -> embed.Embed:
+        vs_emoji = ':vs:' if not use_custom_emojis else CUSTOM_EMOJIS['SWORDS']
+        star_emoji = ':star:' if not use_custom_emojis else CUSTOM_EMOJIS['STAR']
+        lose_war_emoji = ':broken_heart:' if not use_custom_emojis else CUSTOM_EMOJIS['LOSE_WAR']
+        win_war_emoji = ':mechanical_arm:' if not use_custom_emojis else CUSTOM_EMOJIS['WIN_WAR']
+
+        if self.state == 'notInWar':
+            return embed.Embed(__('No ongoing war'), color=0xff7f00)
+        title = __('Current clan war')
+        if self.league_day is not None:
+            title += ' - ' + __('CWL Day %1', self.league_day)
+
+        result_embed = embed.Embed(title, f'**`{self.clan.name}`** {vs_emoji} `{self.opponent.name}`', color=0xdddd00)
+
+        if self.state == 'preparation':
+            result_embed.add_field(__('Battle day start'), f'<t:{to_timestamp(self.war_start_time)}:R>')
+            result_embed.set_color(0xff7f00)
+            return result_embed.set_footer(__('Battle day start: %1', f'<t:{to_timestamp(self.war_start_time)}:R>'))
+
+        clan_attacks = f'{self.clan.attacks}/{self.attacks_per_clan}'
+        opponent_attacks = f'{self.opponent.attacks}/{self.attacks_per_clan}'
+        result_embed.add_field(
+            f'{self.clan.stars} {star_emoji} {self.opponent.stars}',
+            f'{self.clan.destruction_percentage}% - {self.opponent.destruction_percentage}%'
+        )
+        result_embed.add_field(__('Attacks'), f'{clan_attacks} :crossed_swords: {opponent_attacks}')
+        if self.state == 'warEnded':
+            result_embed.add_separator()
+            star_diff = self.clan.stars - self.opponent.stars
+            percentage_diff = self.clan.destruction_percentage - self.opponent.destruction_percentage
+            if star_diff == 0 and percentage_diff == 0:
+                result_embed.add_field(f':handshake: {__('Draw')}', '')
+                result_embed.set_color(0xb3ebf2)
+            elif star_diff > 0 or (star_diff == 0 and percentage_diff > 0):
+                result_embed.add_field(f'{win_war_emoji} {__('Win')}', '')
+                result_embed.set_color(0x0bda51)
+            else:
+                result_embed.add_field(f'{lose_war_emoji} {__('Lose')}', '')
+                result_embed.set_color(0xf53d3d)
+        elif self.state == 'inWar':
+            result_embed.add_field(__('End'), f'<t:{to_timestamp(self.end_time)}:R>')
+            if short:
+                return result_embed
+
+            uncleared_bases = [
+                m.str_as_defender(use_custom_emojis)
+                for m in self.opponent.members
+                if m.best_opponent_attack is None or m.best_opponent_attack.stars < 3
+            ]
+            if len(uncleared_bases) == 0:
+                result_embed.add_field(
+                    __('Remaining ennemy villages'),
+                    f':white_check_mark: {__('All enemy villages cleared to 100%')}'
+                )
+                return result_embed
+
+            uncleared_bases_str = '\n'.join(uncleared_bases)
+            result_embed.add_field(__('Remaining ennemy villages'), uncleared_bases_str)
+            missing_attacks = [
+                m.missing_attacks_str(self.attacks_per_member, use_custom_emojis)
+                for m in self.clan.members
+                if len(m.attacks) <self.attacks_per_member
+            ]
+            if len(missing_attacks) > 0:
+                missing_attacks_str = '   **;**   '.join(missing_attacks)
+                result_embed.add_field(__('Remaining attacks'), missing_attacks_str)
+            else:
+                result_embed.add_field(__('Remaining attacks'), f':white_check_mark: **{__('No remaining attack')}**')
+
+        now = datetime.now()
+        now_string = f'{now.year}-{str(now.month).rjust(2, '0')}-{str(now.day).rjust(2, '0')}'
+        now_string += f' {str(now.hour).rjust(2, '0')}:{str(now.minute).rjust(2, '0')}:{str(now.second).rjust(2, '0')}'
+        return result_embed.set_footer(f'{__('Last updated: %1', now_string)}')
+
     def build_presence_activity(self) -> Optional[PresenceActivity]:
         if self.state not in ('inWar', 'preparation', 'warEnded'):
             return None
@@ -347,13 +422,27 @@ class Clan:
     def __init__(self, raw_clan: dict) -> None:
         self.tag: str = raw_clan['tag']
         self.name: str = raw_clan['name']
+        self.description: str = raw_clan['description']
+        self.members: int = raw_clan['members']
+
+        self.clan_war_league: str = raw_clan['warLeague']['name']
+        self.war_win_streak: str = raw_clan['warWinStreak']
+
+        self.capital_league: str = raw_clan['capitalLeague']['name']
+        self.capital_hall_level: int = raw_clan['clanCapital']['capitalHallLevel']
+
         self.badge_url: str = raw_clan['badgeUrls']['large']
 
     def get_invite_link(self) -> str:
         return f'https://link.clashofclans.com/fr?action=OpenClanProfile&tag={self.tag}'
 
     def as_discord_embed(self) -> embed.Embed:
-        return embed.Embed(self.name, self.tag, url=self.get_invite_link()).set_thumbnail(self.badge_url)
+        return embed.Embed(self.name, self.tag, url=self.get_invite_link()) \
+            .set_thumbnail(self.badge_url) \
+            .add_field(__('Members'), f'{self.members} / 50') \
+            .add_field(__('War win streak'), self.war_win_streak) \
+            .set_footer(self.description)
+        # CWL, Capitale HDV, capitale upgrades xapitale league
 
 
 class Player:

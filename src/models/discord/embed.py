@@ -27,7 +27,7 @@ class Embed:
         self.author: Optional[dict] = None
         self.fields: list[dict] = []
 
-    def set_footer(self, text: str, icon_url: Optional[str], proxy_icon_url: Optional[str]) -> Self:
+    def set_footer(self, text: str, icon_url: Optional[str] = None, proxy_icon_url: Optional[str] = None) -> Self:
         self.footer = {'text': text}
         if icon_url is not None:
             self.footer['icon_url'] = icon_url
@@ -93,6 +93,10 @@ class Embed:
             self.provider['url'] = url
         return self
 
+    def set_color(self, color: int) -> Self:
+        self.color = color
+        return self
+
     def set_author(
         self,
         name: str,
@@ -108,6 +112,9 @@ class Embed:
         if proxy_icon_url is not None:
             self.author['proxy_icon_url'] = proxy_icon_url
         return self
+
+    def add_separator(self) -> Self:
+        return self.add_field('\u200B', '\u200B')
 
     def add_field(self, name: str, value: str, inline: Optional[bool] = None) -> Self:
         if len(self.fields) >= 25:
@@ -136,6 +143,8 @@ class Embed:
             result['image'] = self.image
         if self.thumbnail is not None:
             result['thumbnail'] = self.thumbnail
+        if self.footer is not None:
+            result['footer'] = self.footer
         if self.video is not None:
             result['video'] = self.video
         if self.provider is not None:

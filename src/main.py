@@ -9,7 +9,8 @@ from typing import Literal
 load_dotenv()
 CLAN_TAG = os.environ.get('CLAN_TAG', '#2GLCQ00G0')
 SECONDARY_CLAN_TAG = os.environ.get('SECONDARY_CLAN_TAG', '#2JG02GVYL')
-ENV: Literal['DEV'] | Literal['PROD'] = os.environ.get('ENV', 'DEV')
+ENV = os.environ.get('ENV', 'DEV')
+
 
 async def main():
     log('bouliste2clan - \033[4mhttps://www.github.com/ZiarZer/bouliste2clan\033[0m')
