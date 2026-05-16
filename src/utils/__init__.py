@@ -4,6 +4,12 @@ from base64 import b64encode
 from typing import Optional
 import requests
 from i18n import __
+from dotenv import load_dotenv
+import os
+
+
+load_dotenv()
+ENV = os.environ.get('ENV', 'DEV')
 
 
 MONTH_NAMES = [
@@ -69,3 +75,10 @@ def get_base64_image_from_url(url: str) -> Optional[str]:
     result += ';base64,'
     result += b64encode(requests.get(url).content).decode('utf-8')
     return result
+
+
+def format_message_content_for_env(message: Optional[str]) -> Optional[str]:
+    if ENV == 'DEV':
+        sent_content = message if message is not None else ''
+        return f"{sent_content}\n-# dev"
+    return message

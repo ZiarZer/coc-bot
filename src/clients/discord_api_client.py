@@ -4,19 +4,10 @@ from dotenv import load_dotenv
 
 from models.discord import Message, Guild, embed
 from .base_api_client import BaseApiClient
-from utils import get_base64_image_from_url
+from utils import get_base64_image_from_url, format_message_content_for_env
 
 
 DISCORD_API_BASE_URL = 'https://discord.com/api/v10'
-load_dotenv()
-ENV = os.environ.get('ENV', 'DEV')
-
-
-def format_message_content_for_env(message: Optional[str]) -> Optional[str]:
-    if ENV == 'DEV':
-        sent_content = message if message is not None else ''
-        return f"{sent_content}\n-# dev"
-    return message
 
 
 class DiscordApiClient(BaseApiClient):
@@ -32,8 +23,7 @@ class DiscordApiClient(BaseApiClient):
         content: Optional[str] = None,
         embeds: Optional[list[embed.Embed]] = None
     ) -> Optional[Message]:
-        sent_content = format_message_content_for_env(content)
-        body: dict = {'content': sent_content, 'flags': 1 << 2}
+        body: dict = {'content': content, 'flags': 1 << 2}
         if embeds is not None:
             body['embeds'] = list(map(lambda e: e.to_dict(), embeds))
             body['flags'] = 0

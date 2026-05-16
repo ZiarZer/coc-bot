@@ -13,7 +13,7 @@ from clients import DiscordGatewayClient, ClashOfClansApiClient, DiscordApiClien
 from repositories import CommandUsesRepository, DiscordCocLinksRepository, TroopGiversRepository, WhitelistsRepository
 from services import ClanMembersService, ClanWarsService, CapitalRaidsService
 from i18n import __
-from utils import to_timestamp, parse_year_month, log, LogLevel
+from utils import to_timestamp, parse_year_month, log, LogLevel, format_message_content_for_env
 
 from .custom_pings import parse_custom_ping
 from .commands import Command, requires_role
@@ -145,6 +145,10 @@ class Bot:
             self.commands[command.name] = command
             for alias in command.aliases:
                 self.commands[alias] = command
+
+    async def send_message(channel_id, content):
+        sent_content = format_message_content_for_env(content)
+        await self.discord_api_client.send_message(message.channel_id, sent_content)
 
     async def run(self) -> None:
         self.started_at = time()
